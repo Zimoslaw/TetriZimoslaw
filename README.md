@@ -4,12 +4,12 @@
  Everything is displayed with u8g2 library on 128x64 px monochrome LCD.
  
  For controlling there are 6 buttons (INPUT_PULLUP mode):
- -Left
- -Right
- -Hard drop
- -Soft drop
- -Rotate Right
- -Rotate Left
+ - Left
+ - Right
+ - Hard drop
+ - Soft drop
+ - Rotate Right
+ - Rotate Left
  
  I tried to fully mimic original tetris rules, but some things may be different.
  
