@@ -1,3 +1,10 @@
+/**
+ * TetriZimoslaw by Jakub Niewiarowski 2022
+ * 
+ * Tetriz for Arduino Uno and 128x64 px monochrome LCD
+ * 
+ */
+
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <U8g2lib.h>
@@ -11,11 +18,34 @@
 
 U8G2_ST7565_NHD_C12864_F_4W_SW_SPI u8g2(U8G2_R0, /* clock=*/ 13, /* data=*/ 11, /* cs=*/ 10, /* dc=*/ 9, /* reset=*/ U8X8_PIN_NONE);
 
-byte y = 1, x = 4, shape = 0, nextShape = 0, rotation = 0, lvl = 1, lines = 0, s = 100 /*prędkość spadania (zmienia się przy soft dropie)*/, lastI = 0, prevShape = 0, prevSCounter = 0;;
-unsigned int cycle = 0;
-unsigned long score = 0;
-bool bricks[10][21], input = false;
+byte y = 1 /*block coordinate on Y axis (top of the screen to bottom)*/,
+  x = 4 /*block coordinate on X axis (from left to right)*/,
+  shape = 0 /*ID of current block (shape)
+    0 = O (square)
+    1 = Z
+    2 = S
+    3 = L
+    4 = J (inverted L)
+    5 = I
+  */,
+  nextShape = 0 /*ID of next block (shape)*/,
+  rotation = 0 /*ID of current block's rotation
+    0 = 
+    1 =
+    2 = 
+    3 =
+  */,
+  lvl = 1 /*current level (higher level = higher speed of falling)*/,
+  lines = 0 /*number of cleared lines*/,
+  s = 100 /*falling speed (changes when soft dropping)*/,
+  lastI = 0 /*how many blocks, other than I, was drawn since last I block was drawn*/,
+  prevSCounter = 0 /*how many block of the same shape were in a row*/;
+unsigned int cycle = 0; /*number of cycles. Used for time keeping*/
+unsigned long score = 0; /*player's score*/
+bool bricks[10][21] /*coordinate system for bricks. True = display a brick on coordinates given in bricks[x][y]*/,
+  input = false; /*is any input received from user*/
 
+//----------------------------Game Over screen--------------------------
 void gameOver()
 {
   u8g2.clearBuffer();
@@ -49,6 +79,23 @@ void gameOver()
   delay(100000);
 }
 
+//-----------------------------Pause screen-----------------------------
+void pause()
+{
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_courB08_tf);
+  u8g2.drawStr(16,60,"PAUSED");
+  u8g2.setFont(u8g2_font_micro_tr);
+  u8g2.sendBuffer();
+  delay(1000);
+  while(true)
+  {
+    if(digitalRead(4)==LOW || digitalRead(5)==LOW)
+      break;
+  }
+}
+
+//--------------Checking if block can fall (move 1 unit down)----------
 bool checkShape(byte x, byte y, byte d)
 {
   switch(shape)
@@ -978,6 +1025,7 @@ bool checkShape(byte x, byte y, byte d)
   }
 }
 
+//----------------------Removing block from matrix-----------------------
 void clearShape(byte x, byte y)
 {
   switch(shape)
@@ -1171,6 +1219,7 @@ void clearShape(byte x, byte y)
   }
 }
 
+//-----------------Putting block on matrix------------------------------
 void drawShape(byte x, byte y)
 {
   switch(shape)
@@ -1364,6 +1413,7 @@ void drawShape(byte x, byte y)
   }
 }
 
+//--------------Drawing little block (next block indicator)-------------------
 void DrawMiniShape(char shape)
 {
   switch(shape)
@@ -1420,6 +1470,7 @@ void DrawMiniShape(char shape)
   }
 }
 
+//----------------Cheacking if any row is full-----------------------
 void checkRows()
 {
   for(byte i = 0; i < 10; i++) //sprawdzenie, czy klocki sięgnęły sufitu
@@ -1430,7 +1481,8 @@ void checkRows()
       break;
     }
   }
-  
+
+  //----------checking for full lines (rows)-------------
   byte r = 0;
   for(byte j=19; j>0; j--)
   {
@@ -1440,13 +1492,13 @@ void checkRows()
       if(bricks[i][j])
         n++;
     }
-    if(n == 10)
+    if(n == 10) //if entire line (row) is full
     {
-      for(byte i=0; i<10; i++)
+      for(byte i=0; i<10; i++) //remove that line
       {
         bricks[i][j] = false;
       }
-      for(byte k=j; k>0; k--)
+      for(byte k=j; k>0; k--) //Move all the lines above one unit down
       {
         for(byte i=0; i<10; i++)
         {
@@ -1458,31 +1510,31 @@ void checkRows()
       }
       r++;
       lines++;
-      switch(r)
+      switch(r) //Points for clearing a row are dependent on number of rows cleared at one time
       {
         case 1:
           score += 40 * lvl;
         break;
         case 2:
-          score += 60 * lvl;
+          score += 100 * lvl;
         break;
         case 3:
-          score += 200 * lvl;
+          score += 300 * lvl;
         break;
-        case 4:
-          score += 900 * lvl;
+        case 4: //TETRIZ!
+          score += 1200 * lvl;
           r = 0;
         break;
       }
       j++;
     }
   }
-  for(byte i=0; i<10; i++) //pętla inicjalizująca "podłogę", która zatrzymuje wszystkie klocki na dnie
+  for(byte i=0; i<10; i++) //Creating "floor" for blocks to stop at the bottom of the matrix
   {
     bricks[i][20] = true;
   }
   
-  if(lines >= 10) //następny poziom
+  if(lines >= 10) //leveling
   {
     lvl = 2;
     if(lines >= 20)
@@ -1522,31 +1574,31 @@ void checkRows()
 
 void setup(void)
 {
-  pinMode(2, INPUT_PULLUP); //prawo
+  //------------Buttons---------------
+  pinMode(2, INPUT_PULLUP); //right
   pinMode(3, INPUT_PULLUP); //lewo
   pinMode(4, INPUT_PULLUP); //R
   pinMode(5, INPUT_PULLUP); //L
   pinMode(6, INPUT_PULLUP); //H
   pinMode(7, INPUT_PULLUP); //S
+
+  //Initialization of screen
   u8g2.begin();
   u8g2.setDisplayRotation(U8G2_R3);
-  //ekran startowy
+  
+  //-------------Start screen-------------------
     u8g2.setFont(u8g2_font_pieceofcake_mel_tr);
-    u8g2.drawStr(5,50,"TETRIS");
+    u8g2.drawStr(5,50,"TETRIZ");
     u8g2.setFont(u8g2_font_micro_tr);
     u8g2.drawStr(2,58,"Arduino edition");
     u8g2.drawStr(28,70,"by");
     u8g2.drawStr(22,77,"Jakub");
     u8g2.drawStr(9,84,"Niewiarowski");
+    u8g2.drawStr(24,94,"2022");
     u8g2.sendBuffer();
     delay(3000);
-  //
 
-  for(byte i=0; i<10; i++) //pętla inicjalizująca "podłogę", która zatrzymuje wszystkie klocki na dnie
-  {
-    bricks[i][20] = true;
-  }
-  
+  //-----------Initializing block--------------
   randomSeed(analogRead(0));
   shape = random(0,7);
   nextShape = random(0,7);
@@ -1554,10 +1606,11 @@ void setup(void)
 }
 
 void loop(void) {
-//-----------------------------input i wyświetlanie (10 razy na sekundę)------------------
-if(cycle % 5 == 0)
+  
+  //-----------------------------Input and displaying (20 times per second)------------------
+  if(cycle % 5 == 0) //1 cycle = 10ms
   {
-    if(digitalRead(2)==LOW && !input && x < 9) //prawo
+    if(digitalRead(2)==LOW && !input && x < 9) //right
     {
       if(checkShape(x,y,1))
       {
@@ -1567,7 +1620,7 @@ if(cycle % 5 == 0)
         input = true;
       }
     }
-    else if(digitalRead(3)==LOW && !input && x > 0) //lewo
+    else if(digitalRead(3)==LOW && !input && x > 0) //left
     {
       if(checkShape(x,y,2))
       {
@@ -1577,8 +1630,11 @@ if(cycle % 5 == 0)
         input = true;
       }
     }
-    else if(digitalRead(4)==LOW && !input) //R (obrót w prawo)
+    else if(digitalRead(4)==LOW && !input) //R (rotate right)
     {
+      if(digitalRead(5)==LOW)
+        pause();
+        
       if(rotation == 0 || rotation == 2)
       {
         if(checkShape(x,y,3))
@@ -1610,8 +1666,11 @@ if(cycle % 5 == 0)
         }
       }
     }
-    else if(digitalRead(5)==LOW && !input) //L (obrót w lewo)
+    else if(digitalRead(5)==LOW && !input) //L (rotate left)
     {
+      if(digitalRead(4)==LOW)
+        pause();
+        
       if(rotation == 0 || rotation == 2)
       {
         if(checkShape(x,y,4))
@@ -1644,12 +1703,12 @@ if(cycle % 5 == 0)
       }
   }
   else if(digitalRead(6)==LOW && !input) // H (hard drop)
-  {
+  {  
     for(byte i = y; i < 20; i++)
     {
       if(!checkShape(x,i,0))
       {
-        score += i - y;
+        score += (i - y)*2;
         clearShape(x,y);
         y = i;
         drawShape(x,y);
@@ -1672,12 +1731,12 @@ if(cycle % 5 == 0)
     s = 100;
   }
   
-//--------------------rysowanie wszystkich klocków i statystyk gry-----------------
+//--------------------Drawing of blocks and game statistics-----------------
     u8g2.clearBuffer();
     u8g2.drawFrame(6,0,52,102);
     u8g2.drawStr(1,112,"SCORE:"); u8g2.setCursor(26, 112); u8g2.print(score);
     u8g2.drawStr(1,122,"LEVEL:"); u8g2.setCursor(26, 122); u8g2.print(lvl);
-    switch(nextShape) // następny kształt
+    switch(nextShape) // Next shape (little shape in statistics)
     {
       case 0:
         DrawMiniShape('O');
@@ -1701,6 +1760,7 @@ if(cycle % 5 == 0)
         DrawMiniShape('I');
       break;
     }
+    //----------Drawing bricks on matrix-------------
     for(byte j=0; j<20; j++)
     {
       for(byte i=0; i<10; i++)
@@ -1714,17 +1774,17 @@ if(cycle % 5 == 0)
     }
     u8g2.sendBuffer();
 }
- delay(10); 
+ delay(10);
   
-//----------------spadanie (prędkość zależy od lvl)--------------------------
+//----------------falling (speed is influenced by lvl)--------------------------
   if(cycle >= (s / (lvl + 2)))
   {
     clearShape(x,y);
-    if(checkShape(x,y,0)) //spadanie
+    if(checkShape(x,y,0)) //falling (checking if block can fall [move down by 1 unit])
     {
       y++;
     }
-    else
+    else //block has fallen
     {
       drawShape(x,y);
       y = 1;
@@ -1732,13 +1792,14 @@ if(cycle % 5 == 0)
       checkRows();
       rotation = 0;
       shape = nextShape;
-      if(lastI < 7)
+      //---------------Getting next shape--------------
+      if(lastI < 7) //Preventing from a "starving" of I block (lack of I block too many times in a row)
       {
-        if(prevSCounter >= 1)
+        if(prevSCounter >= 1) //Preventing from drawing the same shape too many times in a row
         {
           do
             nextShape = random(0,7);
-          while(nextShape == shape);  
+          while(nextShape == shape);
         }
         else
         {
@@ -1753,15 +1814,21 @@ if(cycle % 5 == 0)
         else
           lastI++;
       }
-      else
+      else //If last I block was was 7 blocks ago then next shape must be I
       {
         nextShape = 6;
         lastI = 0;
       }
     }
     drawShape(x,y);
+
+    for(byte i=0; i<10; i++) //Creating "floor" for blocks to stop at the bottom of the matrix
+    {
+      bricks[i][20] = true;
+    }
     
     cycle = 0;
   }
+  
   cycle++;
 }
