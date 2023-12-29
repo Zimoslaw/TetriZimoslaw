@@ -1,5 +1,5 @@
 /**
- * TetriZimoslaw by Jakub Niewiarowski 2022
+ * TetriZimoslaw by Jakub Niewiarowski 2023
  * 
  * Tetriz for Arduino Uno and 128x64 px monochrome LCD
  * 
@@ -58,12 +58,12 @@ void gameOver()
   u8g2.drawStr(10,80,"BEST SCORE:");
   u8g2.setCursor(14, 88);
   unsigned long bestScore = 0;
-  for(int i=0; i<4; i++)
+  for(byte i=0; i<4; i++)
      bestScore += EEPROM.read(i)*pow(256,3-i);
   u8g2.print(bestScore);
   if(score > bestScore)
   {
-    for(int i=0; i<4; i++)
+    for(byte i=0; i<4; i++)
     {
       unsigned long x = floor(score/pow(256,3-i));
       EEPROM.write(i,x);
@@ -1731,7 +1731,7 @@ void loop(void) {
     s = 100;
   }
   
-//--------------------Drawing of blocks and game statistics-----------------
+  //--------------------Drawing of blocks and game statistics-----------------
     u8g2.clearBuffer();
     u8g2.drawFrame(6,0,52,102);
     u8g2.drawStr(1,112,"SCORE:"); u8g2.setCursor(26, 112); u8g2.print(score);
@@ -1773,10 +1773,10 @@ void loop(void) {
       }
     }
     u8g2.sendBuffer();
-}
- delay(10);
+  }
+  delay(10);
   
-//----------------falling (speed is influenced by lvl)--------------------------
+  //----------------falling (speed is influenced by lvl)--------------------------
   if(cycle >= (s / (lvl + 2)))
   {
     clearShape(x,y);
